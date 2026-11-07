@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import "./App.css";
 
 type SearchResult = {
@@ -32,12 +32,12 @@ function App() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [documentsLoading, setDocumentsLoading] = useState(false);
   const [documentsError, setDocumentsError] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState("");
+  const [uploadError, setUploadError] = useState("");
 
-  useEffect(() => {
-    void fetchDocuments();
-  }, []);
-
-  async function fetchDocuments() {
+  const fetchDocuments = useCallback(async () => {
     setDocumentsLoading(true);
     setDocumentsError("");
 
@@ -49,12 +49,66 @@ function App() {
       }
 
       const data: DocumentsResponse = await response.json();
-
       setDocuments(data.documents);
     } catch (err) {
       setDocumentsError(err instanceof Error ? err.message : "获取文档失败");
     } finally {
       setDocumentsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchDocuments();
+  }, [fetchDocuments]);
+
+  async function handleUpload() {
+    if (!selectedFile) {
+      setUploadError("请先选择一个文件");
+      return;
+    }
+
+    if (selectedFile.size > 5 * 1024 * 1024) {
+      setUploadError("文件大小不能超过 5 MB");
+      return;
+    }
+
+    setUploading(true);
+    setUploadMessage("");
+    setUploadError("");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+
+      const response = await fetch("http://127.0.0.1:8000/documents/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || "上传失败");
+      }
+
+      setUploadMessage("文档上传成功！");
+      setSelectedFile(null);
+
+      // 上传成功后清空文件选择框
+      const fileInput = document.getElementById(
+        "document-upload",
+      ) as HTMLInputElement | null;
+
+      if (fileInput) {
+        fileInput.value = "";
+      }
+
+      // 自动刷新知识库列表
+      await fetchDocuments();
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "上传失败");
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -185,6 +239,48 @@ function App() {
             ))}
           </div>
         )}
+      </section>
+
+      <section className="upload-section">
+        <div className="upload-heading">
+          <p className="eyebrow">ADD NEW DOCUMENT</p>
+          <h2>上传知识文档</h2>
+          <p>上传 TXT 或 Markdown 文件，扩展你的知识库。</p>
+        </div>
+
+        <div className="upload-card">
+          <div className="upload-icon">↑</div>
+
+          <h3>选择一个文件</h3>
+          <p>支持 .txt、.md 格式，最大 5 MB</p>
+
+          <input
+            id="document-upload"
+            type="file"
+            accept=".txt,.md,text/plain,text/markdown"
+            onChange={(event) => {
+              setSelectedFile(event.target.files?.[0] || null);
+              setUploadMessage("");
+              setUploadError("");
+            }}
+          />
+
+          {selectedFile && (
+            <p className="selected-file">已选择：{selectedFile.name}</p>
+          )}
+
+          <button
+            className="upload-button"
+            onClick={handleUpload}
+            disabled={!selectedFile || uploading}
+          >
+            {uploading ? "正在上传..." : "上传文档"}
+          </button>
+
+          {uploadMessage && <p className="upload-success">{uploadMessage}</p>}
+
+          {uploadError && <p className="upload-error">{uploadError}</p>}
+        </div>
       </section>
 
       <section className="documents-section">

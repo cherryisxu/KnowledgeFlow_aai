@@ -375,3 +375,98 @@ input {
     padding: 14px;
   }
 }
+
+/* 上传区域 */
+.upload-section {
+  width: min(900px, 100%);
+  margin: 60px auto 72px;
+}
+
+.upload-heading {
+  margin-bottom: 22px;
+}
+
+.upload-heading h2 {
+  margin: 8px 0;
+  font-size: 24px;
+}
+
+.upload-heading > p:last-child {
+  color: #858ba0;
+  font-size: 14px;
+}
+
+.upload-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 36px 20px;
+  border: 1px dashed #c9c5ed;
+  border-radius: 18px;
+  background: #ffffff;
+  text-align: center;
+}
+
+.upload-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: #eeedff;
+  color: #635bdb;
+  font-size: 30px;
+  font-weight: 600;
+}
+
+.upload-card h3 {
+  margin: 16px 0 6px;
+  font-size: 16px;
+}
+
+.upload-card > p {
+  color: #858ba0;
+  font-size: 13px;
+}
+
+.upload-card input {
+  max-width: 100%;
+  margin: 18px 0;
+  font-size: 13px;
+}
+
+.selected-file {
+  color: #635bdb !important;
+  overflow-wrap: anywhere;
+}
+
+.upload-button {
+  padding: 12px 28px;
+  border: none;
+  border-radius: 10px;
+  background: #635bdb;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.upload-button:hover:not(:disabled) {
+  background: #5149c4;
+}
+
+.upload-button:disabled {
+  background: #b8b5d9;
+  cursor: not-allowed;
+}
+
+.upload-success {
+  margin-top: 16px;
+  color: #318653 !important;
+}
+
+.upload-error {
+  margin-top: 16px;
+  color: #d64545 !important;
+}

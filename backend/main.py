@@ -86,8 +86,11 @@ from knowledge_base import build_chunks_from_db
 from database import (
     init_db,
     get_or_create_default_knowledge_base,
+    save_document_with_chunks,
+    get_connection,
     get_documents,
     delete_document,
+
 )
 from bm25_retriever import BM25Retriever
 from llm_service import generate_answer
