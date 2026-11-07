@@ -506,3 +506,57 @@ input {
     gap: 8px;
   }
 }
+
+.mode-switch {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  margin-top: 20px;
+}
+
+.mode-button {
+  padding: 10px 22px;
+  border: 1px solid #e5e7f0;
+  border-radius: 10px;
+  background: white;
+  color: #858ba0;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.mode-button:hover {
+  border-color: #635bdb;
+  color: #635bdb;
+}
+
+.mode-button.active {
+  background: #635bdb;
+  border-color: #635bdb;
+  color: white;
+}
+
+.answer-card {
+  padding: 26px;
+  border: 1px solid #e5e7f0;
+  border-radius: 16px;
+  background: white;
+  box-shadow: 0 4px 16px rgba(30, 35, 70, 0.04);
+}
+
+.answer-content {
+  color: #30354a;
+  font-size: 15px;
+  line-height: 1.9;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.sources-section {
+  margin-top: 32px;
+}
+
+.sources-section .results-heading {
+  margin-bottom: 18px;
+}

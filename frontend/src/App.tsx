@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
+import ReactMarkdown from "react-markdown";
 import "./App.css";
 
 type SearchResult = {
+  chunk_id: string;
+  content: string;
+  source: string;
+  score: number;
+};
+
+type AnswerSource = {
   chunk_id: string;
   content: string;
   source: string;
@@ -26,6 +34,13 @@ type DocumentsResponse = {
 function App() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
+
+  type QueryMode = "retrieve" | "answer";
+  const [queryMode, setQueryMode] = useState<QueryMode>("retrieve");
+
+  const [answer, setAnswer] = useState("");
+  const [answerSources, setAnswerSources] = useState<AnswerSource[]>([]);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [searched, setSearched] = useState(false);
@@ -161,23 +176,41 @@ function App() {
   async function handleSearch() {
     const question = query.trim();
 
-    if (!question || loading) return;
+    if (!question) {
+      return;
+    }
 
     setLoading(true);
     setError("");
     setResults([]);
-    setSearched(false);
+    setAnswer("");
+    setAnswerSources([]);
+    setSearched(true);
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/retrieve", {
+      // 根据当前模式选择接口
+      const endpoint =
+        queryMode === "retrieve"
+          ? "http://127.0.0.1:8000/retrieve"
+          : "http://127.0.0.1:8000/answer";
+
+      const requestBody =
+        queryMode === "retrieve"
+          ? {
+              query: question,
+              top_k: 3,
+            }
+          : {
+              question: question,
+              top_k: 3,
+            };
+
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          query: question,
-          top_k: 3,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -186,10 +219,16 @@ function App() {
 
       const data = await response.json();
 
-      setResults(data.results);
-      setSearched(true);
+      if (queryMode === "retrieve") {
+        // 检索模式：保存原始检索结果
+        setResults(data.results || []);
+      } else {
+        // AI 问答模式：保存生成答案和参考来源
+        setAnswer(data.answer || "");
+        setAnswerSources(data.sources || []);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "发生了未知错误");
+      setError(err instanceof Error ? err.message : "搜索失败");
     } finally {
       setLoading(false);
     }
@@ -213,6 +252,26 @@ function App() {
         </h1>
 
         <p className="subtitle">搜索你的知识库，快速找到真正需要的信息。</p>
+
+        <div className="mode-switch">
+          <button
+            className={
+              queryMode === "retrieve" ? "mode-button active" : "mode-button"
+            }
+            onClick={() => setQueryMode("retrieve")}
+          >
+            检索模式
+          </button>
+
+          <button
+            className={
+              queryMode === "answer" ? "mode-button active" : "mode-button"
+            }
+            onClick={() => setQueryMode("answer")}
+          >
+            AI 问答模式
+          </button>
+        </div>
 
         <form
           className="search-box"
@@ -256,34 +315,85 @@ function App() {
           </div>
         )}
 
-        {!loading && searched && results.length === 0 && (
-          <div className="empty-state">
-            <div className="empty-icon">⌕</div>
-            <h2>暂时没有找到匹配内容</h2>
-            <p>试试换一种问法，或使用知识库中已有的关键词。</p>
-          </div>
-        )}
-
-        {!loading && searched && results.length > 0 && (
-          <div className="results-list">
-            <div className="results-heading">
-              <h2>检索结果</h2>
-              <span>找到 {results.length} 条内容</span>
-            </div>
-
-            {results.map((result) => (
-              <article className="result-card" key={result.chunk_id}>
-                <div className="result-meta">
-                  <span>{result.source}</span>
-                  <span>相关性分数：{result.score.toFixed(3)}</span>
+        {/* 检索模式 */}
+        {!loading && !error && searched && queryMode === "retrieve" && (
+          <>
+            {results.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-icon">⌕</div>
+                <h2>暂时没有找到匹配内容</h2>
+                <p>试试换一种问法，或使用知识库中已有的关键词。</p>
+              </div>
+            ) : (
+              <div className="results-list">
+                <div className="results-heading">
+                  <h2>检索结果</h2>
+                  <span>找到 {results.length} 条内容</span>
                 </div>
 
-                <p>{result.content}</p>
+                {results.map((result) => (
+                  <article className="result-card" key={result.chunk_id}>
+                    <div className="result-meta">
+                      <span>{result.source}</span>
+                      <span>相关性分数：{result.score.toFixed(3)}</span>
+                    </div>
 
-                <span className="chunk-id">ID：{result.chunk_id}</span>
-              </article>
-            ))}
-          </div>
+                    <p>{result.content}</p>
+
+                    <span className="chunk-id">ID：{result.chunk_id}</span>
+                  </article>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* AI 问答模式 */}
+        {!loading && !error && searched && queryMode === "answer" && (
+          <>
+            {!answer ? (
+              <div className="empty-state">
+                <div className="empty-icon">⌕</div>
+                <h2>暂时没有生成回答</h2>
+                <p>试试换一种问法，或检查知识库中是否有相关内容。</p>
+              </div>
+            ) : (
+              <div className="results-list">
+                <div className="results-heading">
+                  <h2>AI 回答</h2>
+                  <span>基于知识库生成</span>
+                </div>
+
+                <article className="answer-card">
+                  <div className="answer-content">
+                    <ReactMarkdown>{answer}</ReactMarkdown>
+                  </div>
+                </article>
+
+                {answerSources.length > 0 && (
+                  <div className="sources-section">
+                    <div className="results-heading">
+                      <h2>参考来源</h2>
+                      <span>{answerSources.length} 条参考内容</span>
+                    </div>
+
+                    {answerSources.map((source) => (
+                      <article className="result-card" key={source.chunk_id}>
+                        <div className="result-meta">
+                          <span>{source.source}</span>
+                          <span>相关性分数：{source.score.toFixed(3)}</span>
+                        </div>
+
+                        <p>{source.content}</p>
+
+                        <span className="chunk-id">ID：{source.chunk_id}</span>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
       </section>
 
