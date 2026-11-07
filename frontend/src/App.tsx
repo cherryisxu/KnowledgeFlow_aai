@@ -36,6 +36,9 @@ function App() {
   const [uploading, setUploading] = useState(false);
   const [uploadMessage, setUploadMessage] = useState("");
   const [uploadError, setUploadError] = useState("");
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deleteMessage, setDeleteMessage] = useState("");
+  const [deleteError, setDeleteError] = useState("");
 
   const fetchDocuments = useCallback(async () => {
     setDocumentsLoading(true);
@@ -75,6 +78,8 @@ function App() {
     setUploading(true);
     setUploadMessage("");
     setUploadError("");
+    setDeleteMessage("");
+    setDeleteError("");
 
     try {
       const formData = new FormData();
@@ -109,6 +114,47 @@ function App() {
       setUploadError(err instanceof Error ? err.message : "上传失败");
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function handleDelete(documentId: number) {
+    const confirmed = window.confirm("确定要删除这份文档吗？删除后无法恢复。");
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeleteMessage("");
+    setDeleteError("");
+    setDeletingId(documentId);
+    setDeleteMessage("");
+    setDeleteError("");
+
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:8000/documents/${documentId}`,
+        {
+          method: "DELETE",
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || "删除失败");
+      }
+
+      setDeleteMessage("文档删除成功！");
+      setTimeout(() => {
+        setDeleteMessage("");
+      }, 3000);
+
+      // 刷新文档列表
+      await fetchDocuments();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "删除失败");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -306,6 +352,10 @@ function App() {
           </div>
         )}
 
+        {deleteMessage && <p className="upload-success">{deleteMessage}</p>}
+
+        {deleteError && <p className="upload-error">{deleteError}</p>}
+
         {!documentsLoading && !documentsError && documents.length > 0 && (
           <div className="documents-list">
             {documents.map((doc) => (
@@ -321,9 +371,19 @@ function App() {
                   </div>
                 </div>
 
-                <span className="document-status">
-                  {doc.status === "completed" ? "已完成" : doc.status}
-                </span>
+                <div className="document-actions">
+                  <span className="document-status">
+                    {doc.status === "completed" ? "已完成" : doc.status}
+                  </span>
+
+                  <button
+                    className="delete-button"
+                    onClick={() => handleDelete(doc.id)}
+                    disabled={deletingId === doc.id}
+                  >
+                    {deletingId === doc.id ? "删除中..." : "删除"}
+                  </button>
+                </div>
               </article>
             ))}
           </div>
