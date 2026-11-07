@@ -218,4 +218,50 @@ def save_document_with_chunks(
             "status": "completed",
             "chunk_count": len(chunks),
         }
+def get_documents(knowledge_base_id: int):
+    """获取指定知识库下的所有文档信息"""
 
+    with get_connection() as conn:
+        rows = conn.execute("""
+            SELECT
+                id,
+                filename,
+                file_type,
+                status,
+                chunk_count,
+                created_at,
+                updated_at
+            FROM documents
+            WHERE knowledge_base_id = ?
+            ORDER BY id DESC
+        """, (knowledge_base_id,)).fetchall()
+
+    return [dict(row) for row in rows]
+
+def delete_document(document_id: int):
+    """删除指定文档及其关联的 Chunks，并返回原始文件路径"""
+
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT file_path
+            FROM documents
+            WHERE id = ?
+            """,
+            (document_id,),
+        ).fetchone()
+
+        if row is None:
+            return None
+
+        file_path = row["file_path"]
+
+        conn.execute(
+            """
+            DELETE FROM documents
+            WHERE id = ?
+            """,
+            (document_id,),
+        )
+
+        return file_path

@@ -83,7 +83,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # from knowledge_base import build_chunks
 from knowledge_base import build_chunks_from_db
-from database import init_db, get_or_create_default_knowledge_base
+from database import (
+    init_db,
+    get_or_create_default_knowledge_base,
+    get_documents,
+    delete_document,
+)
 from bm25_retriever import BM25Retriever
 from llm_service import generate_answer
 
@@ -95,7 +100,8 @@ from fastapi import UploadFile, File
 from database import (
     init_db,
     get_or_create_default_knowledge_base,
-    save_document_with_chunks,
+    get_documents,
+    delete_document,
     get_connection,
 )
 
@@ -121,7 +127,7 @@ app.add_middleware(
         "http://127.0.0.1:5173",
     ],
     allow_credentials=False,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["Content-Type"],
 )
 
@@ -334,7 +340,107 @@ def refresh_knowledge_base():
             status_code=500,
             detail=f"知识库刷新失败：{exc}",
         ) from exc
+# =========================
+# 9. 获取文档列表
+# =========================
 
+@app.get("/documents")
+def list_documents():
+
+    # 获取默认知识库
+    knowledge_base = get_or_create_default_knowledge_base()
+
+    # 查询知识库中的文档
+    documents = get_documents(knowledge_base["id"])
+
+    return {
+        "count": len(documents),
+        "documents": documents,
+    }
+# =========================
+# 10. 删除文档
+# =========================
+
+@app.delete("/documents/{document_id}")
+def remove_document(document_id: int):
+
+    global chunks, retriever
+
+    # 1. 查询文档是否存在
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT file_path
+            FROM documents
+            WHERE id = ?
+            """,
+            (document_id,),
+        ).fetchone()
+
+    if row is None:
+        raise HTTPException(
+            status_code=404,
+            detail="文档不存在",
+        )
+
+    # 2. 获取并检查文件路径
+    original_path = Path(row["file_path"])
+
+    if not original_path.is_absolute():
+        original_path = BASE_DIR / original_path
+
+    file_path = original_path.resolve()
+    uploads_root = UPLOADS_DIR.resolve()
+
+    # 只允许删除 uploads 目录直接包含的文件
+    if file_path.parent != uploads_root:
+        raise HTTPException(
+            status_code=400,
+            detail="文件路径不安全，拒绝删除",
+        )
+
+    # 3. 删除数据库记录及关联 Chunks
+    deleted_path = delete_document(document_id)
+
+    if deleted_path is None:
+        raise HTTPException(
+            status_code=404,
+            detail="文档不存在或已被删除",
+        )
+
+    # 4. 删除原始文件
+    file_deleted = False
+
+    try:
+        if file_path.exists():
+            file_path.unlink()
+            file_deleted = True
+
+    except OSError:
+        # 数据库已经删除，文件删除失败时保留提示
+        pass
+
+    # 5. 从数据库重新构建 BM25 索引
+    try:
+        new_chunks = build_chunks_from_db()
+        new_retriever = BM25Retriever(new_chunks)
+
+        chunks = new_chunks
+        retriever = new_retriever
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"文档已删除，但 BM25 索引重建失败：{exc}",
+        ) from exc
+
+    # 6. 返回结果
+    return {
+        "message": "文档删除成功",
+        "document_id": document_id,
+        "file_deleted": file_deleted,
+        "total_chunks": len(chunks),
+    }
 
 @app.post("/documents/upload")
 async def upload_document(file: UploadFile = File(...)):

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "./App.css";
 
 type SearchResult = {
@@ -8,12 +8,55 @@ type SearchResult = {
   score: number;
 };
 
+type Document = {
+  id: number;
+  filename: string;
+  file_type: string;
+  status: string;
+  chunk_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+type DocumentsResponse = {
+  count: number;
+  documents: Document[];
+};
+
 function App() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [searched, setSearched] = useState(false);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
+  const [documentsError, setDocumentsError] = useState("");
+
+  useEffect(() => {
+    void fetchDocuments();
+  }, []);
+
+  async function fetchDocuments() {
+    setDocumentsLoading(true);
+    setDocumentsError("");
+
+    try {
+      const response = await fetch("http://127.0.0.1:8000/documents");
+
+      if (!response.ok) {
+        throw new Error(`请求失败：HTTP ${response.status}`);
+      }
+
+      const data: DocumentsResponse = await response.json();
+
+      setDocuments(data.documents);
+    } catch (err) {
+      setDocumentsError(err instanceof Error ? err.message : "获取文档失败");
+    } finally {
+      setDocumentsLoading(false);
+    }
+  }
 
   async function handleSearch() {
     const question = query.trim();
@@ -138,6 +181,53 @@ function App() {
                 <p>{result.content}</p>
 
                 <span className="chunk-id">ID：{result.chunk_id}</span>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="documents-section">
+        <div className="documents-heading">
+          <div>
+            <p className="eyebrow">YOUR KNOWLEDGE BASE</p>
+            <h2>我的知识库</h2>
+          </div>
+
+          <span className="document-count">共 {documents.length} 份文档</span>
+        </div>
+
+        {documentsLoading && <p className="feedback">正在加载文档...</p>}
+
+        {documentsError && (
+          <div className="feedback error">{documentsError}</div>
+        )}
+
+        {!documentsLoading && !documentsError && documents.length === 0 && (
+          <div className="empty-state">
+            <h2>知识库还是空的</h2>
+            <p>上传第一份文档，开始构建你的知识库。</p>
+          </div>
+        )}
+
+        {!documentsLoading && !documentsError && documents.length > 0 && (
+          <div className="documents-list">
+            {documents.map((doc) => (
+              <article className="document-card" key={doc.id}>
+                <div className="document-info">
+                  <div className="document-icon">
+                    {doc.file_type.toUpperCase()}
+                  </div>
+
+                  <div>
+                    <h3>{doc.filename}</h3>
+                    <p>{doc.chunk_count} 个文本片段</p>
+                  </div>
+                </div>
+
+                <span className="document-status">
+                  {doc.status === "completed" ? "已完成" : doc.status}
+                </span>
               </article>
             ))}
           </div>
