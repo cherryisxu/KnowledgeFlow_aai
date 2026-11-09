@@ -511,9 +511,11 @@ async def upload_document(file: UploadFile = File(...)):
         # 8. 保存文档和 Chunks 到 SQLite
         knowledge_base = get_or_create_default_knowledge_base()
 
+        db_file_path = str(Path("uploads") / stored_filename)
+
         result = save_document_with_chunks(
             filename=filename,
-            file_path=str(file_path),
+            file_path=db_file_path,
             file_type=suffix.lstrip("."),
             chunks=text_chunks,
             knowledge_base_id=knowledge_base["id"],
@@ -547,7 +549,7 @@ async def upload_document(file: UploadFile = File(...)):
         with get_connection() as conn:
             conn.execute(
                 "DELETE FROM documents WHERE file_path = ?",
-                (str(file_path),),
+                (db_file_path,),
             )
 
         file_path.unlink(missing_ok=True)
