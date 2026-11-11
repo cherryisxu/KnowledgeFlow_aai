@@ -80,6 +80,7 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from fastapi.middleware.cors import CORSMiddleware
+from agent.tools.rag_tool import RAGTool
 
 # from knowledge_base import build_chunks
 from knowledge_base import build_chunks_from_db
@@ -153,6 +154,9 @@ chunks = build_chunks_from_db()
 
 # 初始化 BM25 检索器
 retriever = BM25Retriever(chunks)
+
+# 初始化 RAG Tool
+rag_tool = RAGTool(retriever)
 
 # =========================
 # 3. 请求数据模型
@@ -332,6 +336,7 @@ def refresh_knowledge_base():
 
         chunks = new_chunks
         retriever = new_retriever
+        rag_tool.retriever = retriever
 
         return {
             "message": "知识库刷新成功",
@@ -430,6 +435,7 @@ def remove_document(document_id: int):
 
         chunks = new_chunks
         retriever = new_retriever
+        rag_tool.retriever = retriever
 
     except Exception as exc:
         raise HTTPException(
@@ -528,6 +534,7 @@ async def upload_document(file: UploadFile = File(...)):
         # 构建成功后才替换当前索引
         chunks = new_chunks
         retriever = new_retriever
+        rag_tool.retriever = retriever
 
         return {
             "message": "文件上传成功",
